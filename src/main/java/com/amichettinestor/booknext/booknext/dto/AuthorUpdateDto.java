@@ -6,4 +6,6 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class AuthorUpdateDto extends PersonDto{
+
+    //No se puede actualizar sus libros, por regla de negocio.
 }
