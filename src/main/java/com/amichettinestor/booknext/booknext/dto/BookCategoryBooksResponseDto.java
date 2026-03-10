@@ -12,7 +12,7 @@ import java.util.Set;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class BookCategoryResponseDto {
+public class BookCategoryBookResponseDto {
 
     private Long id;
     private String description;
