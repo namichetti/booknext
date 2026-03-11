@@ -17,8 +17,6 @@ import java.util.Set;
 @NoArgsConstructor
 public class OrderUpdateDto {
 
-    private OrderStatus status;
-
     @NotEmpty(message = "La orden debe contener al menos un item")
     @Valid
     @Builder.Default

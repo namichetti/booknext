@@ -14,7 +14,7 @@ public class UserResponseDto {
     private Long id;
     private String name;
     private String lastName;
-    private LocationDto location;
+    private LocationRequestDto location;
     private String address;
     private String email;
 }

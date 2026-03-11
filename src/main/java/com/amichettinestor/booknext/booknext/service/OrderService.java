@@ -1,7 +1,6 @@
 package com.amichettinestor.booknext.booknext.service;
 
 import com.amichettinestor.booknext.booknext.dto.*;
-import org.springframework.security.core.Authentication;
 
 import java.util.List;
 
@@ -17,7 +16,7 @@ public interface OrderService {
 
     OrderResponseDto findById(Long id);
 
-    void changeStatusByManager(Long id, ManagerChangeStatusOrderRequestDto statusUserRequestDto);
+    void changeStatus(Long id, ChangeStatusOrderRequestDto statusUserRequestDto);
 
     List<OrderResponseDto> findAll();
 }

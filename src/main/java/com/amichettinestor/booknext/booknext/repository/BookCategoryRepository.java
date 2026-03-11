@@ -8,7 +8,6 @@ import java.util.List;
 
 public interface BookCategoryRepository extends JpaRepository<BookCategory, Long> {
 
-    boolean existsByDescription(String description);
     List<BookCategory> findByDescriptionContainingIgnoreCase(String description);
 
 }

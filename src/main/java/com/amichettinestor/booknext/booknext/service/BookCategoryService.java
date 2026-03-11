@@ -1,6 +1,7 @@
 package com.amichettinestor.booknext.booknext.service;
 
 import com.amichettinestor.booknext.booknext.dto.BookCategoryRequestDto;
+import com.amichettinestor.booknext.booknext.dto.BookCategoryBooksResponseDto;
 import com.amichettinestor.booknext.booknext.dto.BookCategoryResponseDto;
 
 import java.util.List;
@@ -18,5 +19,7 @@ public interface BookCategoryService {
 
     BookCategoryResponseDto findById(Long id);
 
-    List<BookCategoryResponseDto> findByBookCategoryDescription(String description);
+    List<BookCategoryBooksResponseDto> findByBookCategoryDescription(String description);
+
+    BookCategoryBooksResponseDto findCategoryByIdAndBooks(Long id);
 }

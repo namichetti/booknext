@@ -22,6 +22,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +51,7 @@ public class AuthenticationServiceImpl implements AuthenticationService{
     @Override
     @Transactional(readOnly=true)
     public AutenticationResponseDto authentication(AutheticationRequestDto requestDto) {
+
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(requestDto.getUsername(),
                         requestDto.getPassword()));
@@ -57,6 +59,10 @@ public class AuthenticationServiceImpl implements AuthenticationService{
         //Verifica si existe el username en la base de datos.
         var user = this.userRepository.findByUsername(requestDto.getUsername())
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró el user "+requestDto.getUsername()));
+
+        /*if(user.getStatus() != UserStatus.ACTIVE){
+            throw new DisabledException("Usuario inactivo");
+        }*/
 
         //Si existe entonces generamos el token
         var token =this.jwtService.generatetoken(new SecurityUser(user));

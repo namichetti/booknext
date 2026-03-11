@@ -5,7 +5,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class AuthorRequestDto extends PersonDto{
+public class AuthorRequestDto extends PersonRequestDto {
 
 
 }

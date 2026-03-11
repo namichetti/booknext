@@ -24,7 +24,7 @@ public class UserRequestDto {
 
     @NotNull(message = "La ubicación es obligatoria")
     @Valid
-    private LocationDto location;
+    private LocationRequestDto location;
 
     @NotBlank(message = "La dirección es obligatoria")
     private String address;

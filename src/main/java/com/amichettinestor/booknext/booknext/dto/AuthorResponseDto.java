@@ -7,7 +7,7 @@ import java.util.Set;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class AuthorResponseDto extends PersonDto{
+public class AuthorResponseDto extends PersonRequestDto {
 
     private Long id;
     private Set<BookSummaryDto> books = new HashSet<>();

@@ -1,6 +1,7 @@
 package com.amichettinestor.booknext.booknext.config.security;
 
 import com.amichettinestor.booknext.booknext.entity.User;
+import com.amichettinestor.booknext.booknext.enums.UserStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -46,6 +47,6 @@ public class SecurityUser implements UserDetails{
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return user.getStatus() == UserStatus.ACTIVE;
     }
 }

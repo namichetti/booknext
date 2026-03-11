@@ -16,4 +16,6 @@ public class ChangePasswordRequestDto {
     private String currentPassword;
     @NotBlank(message = "La nueva password es obligatoria")
     private String newPassword;
+    @NotBlank(message = "Se debe confirmar la nueva password")
+    private String confirmationNewPassword;
 }

@@ -46,13 +46,13 @@ public class BookUpdateDto {
     @Positive(message = "El precio debe ser positivo")
     private BigDecimal price;
 
-    @Valid
-    private BookCategoryRequestDto bookCategory;
+    @NotNull(message = "La categoría del libro es obligatoria")
+    private Long bookCategoryId;
 
-    @Builder.Default
-    private Set<@Valid AuthorRequestDto> authorRequestDtos = new HashSet<>();
+    @NotNull(message = "Debe haber al menos un autor")
+    private Set<Long> authorId;
 
-    @Valid
-    private PublisherRequestDto publisherRequest;
+    @NotNull(message = "La editorial es obligatorio")
+    private Long publisherId;
 }
 

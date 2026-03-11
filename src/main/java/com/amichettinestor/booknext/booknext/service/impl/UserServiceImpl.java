@@ -4,9 +4,8 @@ import com.amichettinestor.booknext.booknext.dto.*;
 import com.amichettinestor.booknext.booknext.enums.AdminChangeUserStatus;
 import com.amichettinestor.booknext.booknext.enums.ManagerChangeUserStatus;
 import com.amichettinestor.booknext.booknext.enums.UserStatus;
-import com.amichettinestor.booknext.booknext.exception.AdminChangeStatusException;
-import com.amichettinestor.booknext.booknext.exception.EmailAlreadyExistsException;
-import com.amichettinestor.booknext.booknext.exception.ManagerChangeStatusException;
+import com.amichettinestor.booknext.booknext.exception.*;
+import com.amichettinestor.booknext.booknext.repository.LocationRepository;
 import com.amichettinestor.booknext.booknext.repository.UserRepository;
 import com.amichettinestor.booknext.booknext.service.EmailService;
 import com.amichettinestor.booknext.booknext.service.UserService;
@@ -30,6 +29,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final LocationRepository locationRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .lastName(user.getLastName())
-                .location(LocationDto.builder()
+                .location(LocationRequestDto.builder()
                         .name(user.getLocation().getName())
                         .countryName(user.getLocation().getCountry().getName())
                         .build())
@@ -55,6 +55,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserResponseDto patchMe(UserRequestDto requestDto) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -63,6 +64,14 @@ public class UserServiceImpl implements UserService {
         var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario " + username));
 
+        var location = this.locationRepository.findByNameAndCountryName(
+                        requestDto.getLocation().getName(),
+                        requestDto.getLocation().getCountryName())
+                .orElseThrow(()->new LocationNotFound("No se encontró la localidad "
+                        +requestDto.getLocation().getName()+ " del país "
+                        + requestDto.getLocation().getCountryName()));
+
+        user.setLocation(location);
         PatchUtils.copyNonNullProperties(requestDto, user);
 
         this.userRepository.save(user);
@@ -73,7 +82,7 @@ public class UserServiceImpl implements UserService {
                 .lastName(user.getLastName())
                 .id(user.getId())
                 .email(user.getEmail())
-                .location(LocationDto.builder()
+                .location(LocationRequestDto.builder()
                         .name(user.getLocation().getName())
                         .countryName(user.getLocation().getCountry().getName())
                         .build())
@@ -81,6 +90,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void changeMyUsername(ChangeUsernameRequestDto changeUsernameRequestDto) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -111,8 +121,9 @@ public class UserServiceImpl implements UserService {
             throw new BadCredentialsException("El password actual ingresado es incorrecto");
         }
 
-        if (!changePasswordRequestDto.getNewPassword().equals(changePasswordRequestDto.getCurrentPassword())) {
-            throw new IllegalArgumentException("Los passwords no coinciden");
+        if (!changePasswordRequestDto.getNewPassword().equals(
+                changePasswordRequestDto.getConfirmationNewPassword())) {
+            throw new PasswordsDontMatchException("Los passwords no coinciden");
         }
 
         user.setPassword(passwordEncoder.encode(changePasswordRequestDto.getNewPassword()));
@@ -122,6 +133,7 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
+    @Transactional
     public void changeMyEmail(ChangeEmailRequestDto changeEmailRequestDto) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -153,7 +165,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserResponseDto findById(Long id) {
         var user = userRepository.findById(id)
-                .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id" + id));
+                .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id " + id));
 
         return UserResponseDto.builder()
                 .id(user.getId())
@@ -161,7 +173,7 @@ public class UserServiceImpl implements UserService {
                 .lastName(user.getLastName())
                 .address(user.getAddress())
                 .email(user.getEmail())
-                .location(LocationDto.builder()
+                .location(LocationRequestDto.builder()
                         .countryName(user.getLocation().getCountry().getName())
                         .name(user.getLocation().getName())
                         .build())
@@ -179,7 +191,7 @@ public class UserServiceImpl implements UserService {
                         .lastName(user.getLastName())
                         .address(user.getAddress())
                         .email(user.getEmail())
-                        .location(LocationDto.builder()
+                        .location(LocationRequestDto.builder()
                                 .countryName(user.getLocation().getCountry().getName())
                                 .name(user.getLocation().getName())
                                 .build())
@@ -188,15 +200,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void changeStatusByManager(Long id, ManagerChangeStatusUserRequestDto managerChangeStatusRequestDto) {
         var user = userRepository.findById(id)
-                .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id" + id));
+                .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id " + id));
 
         var requestedStatus = managerChangeStatusRequestDto.getStatus();
-
-        if (requestedStatus != ManagerChangeUserStatus.SUSPENDED) {
-            throw new ManagerChangeStatusException("El estado solicitado no puede ser asignado por un Manager");
-        }
 
         user.setStatus(UserStatus.SUSPENDED);
 
@@ -204,17 +213,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void changeStatusByAdmin(Long id, AdminChangeStatusUserRequestDto adminChangeStatusRequestDto) {
         var user = userRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id" + id));
 
         var requestedStatus = adminChangeStatusRequestDto.getStatus();
-
-        if (requestedStatus != AdminChangeUserStatus.ACTIVE &&
-                requestedStatus != AdminChangeUserStatus.SUSPENDED &&
-                requestedStatus != AdminChangeUserStatus.BANNED) {
-            throw new AdminChangeStatusException("El estado solicitado no puede ser asignado");
-        }
 
         UserStatus newStatus;
         if (requestedStatus == AdminChangeUserStatus.SUSPENDED) {

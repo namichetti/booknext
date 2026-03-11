@@ -29,6 +29,7 @@ public class BookCategoryServiceImpl implements BookCategoryService {
                 .map(category -> {
                     Set<BookResponseDto> booksDto = category.getBooks().stream()
                             .map(book -> BookResponseDto.builder()
+                                    .id(book.getId())
                                     .isbn(book.getIsbn())
                                     .title(book.getTitle())
                                     .description(book.getDescription())
@@ -49,7 +50,6 @@ public class BookCategoryServiceImpl implements BookCategoryService {
 
                     return BookCategoryResponseDto.builder()
                             .description(category.getDescription())
-                            .bookResponseDtos(booksDto)
                             .id(category.getId())
                             .build();
                 }).toList();
@@ -57,6 +57,7 @@ public class BookCategoryServiceImpl implements BookCategoryService {
 
 
     @Override
+    @Transactional
     public void deleteById(Long id) {
         this.bookCategoryRepository.findById(id)
                 .orElseThrow(()->new BookCategoryNotFoundException("La categoría con id "+id+" no existe"));
@@ -64,6 +65,7 @@ public class BookCategoryServiceImpl implements BookCategoryService {
     }
 
     @Override
+    @Transactional
     public void save(BookCategoryRequestDto bookCategoryRequestDto) {
         var category= BookCategory.builder()
                 .description(bookCategoryRequestDto.getDescription())
@@ -84,6 +86,7 @@ public class BookCategoryServiceImpl implements BookCategoryService {
     }
 
     @Override
+    @Transactional
     public void putBookCategory(Long id, BookCategoryRequestDto bookUpdateDto) {
         var category = this.bookCategoryRepository.findById(id)
                 .orElseThrow(()->new BookCategoryNotFoundException("La categoría con id "+id+" no existe"));
@@ -100,9 +103,56 @@ public class BookCategoryServiceImpl implements BookCategoryService {
         var category = this.bookCategoryRepository.findById(id)
                 .orElseThrow(()->new BookCategoryNotFoundException("La categoría con id "+id+" no existe"));
 
+        return BookCategoryResponseDto.builder()
+                .description(category.getDescription())
+                .id(category.getId())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly=true)
+    public List<BookCategoryBooksResponseDto> findByBookCategoryDescription(String description) {
+        var categories = this.bookCategoryRepository.findByDescriptionContainingIgnoreCase(description);
+
+        return categories.stream()
+                .map(category -> BookCategoryBooksResponseDto.builder()
+                        .description(category.getDescription())
+                        .id(category.getId())
+                        .bookResponseDtos(category.getBooks().stream()
+                                .map(book -> BookResponseDto.builder()
+                                        .isbn(book.getIsbn())
+                                        .id(book.getId())
+                                        .title(book.getTitle())
+                                        .description(book.getDescription())
+                                        .editionNumber(book.getEditionNumber())
+                                        .dimensions(book.getDimensions())
+                                        .pageCount(book.getPageCount())
+                                        .weight(book.getWeight())
+                                        .stock(book.getStock())
+                                        .price(book.getPrice())
+                                        .publisher(book.getPublisher().getName())
+                                        .bookCategory(book.getBookCategory().getDescription())
+                                        .authors(book.getAuthors().stream()
+                                                .map(author -> author.getName()+
+                                                        " "+author.getLastName())
+                                                .collect(Collectors.toSet()))
+                                        .build())
+                                .collect(Collectors.toSet()))
+                        .build())
+                .toList();
+
+    }
+
+    @Override
+    @Transactional(readOnly=true)
+    public BookCategoryBooksResponseDto findCategoryByIdAndBooks(Long id) {
+        var category = this.bookCategoryRepository.findById(id)
+                .orElseThrow(()->new BookCategoryNotFoundException("La categoría con id "+id+" no existe"));
+
         var bookResponseDtos= category.getBooks().stream()
                 .map(book -> BookResponseDto.builder()
                         .isbn(book.getIsbn())
+                        .id(book.getId())
                         .title(book.getTitle())
                         .description(book.getDescription())
                         .editionNumber(book.getEditionNumber())
@@ -120,41 +170,10 @@ public class BookCategoryServiceImpl implements BookCategoryService {
                         .build())
                 .collect(Collectors.toSet());
 
-        return BookCategoryResponseDto.builder()
+        return BookCategoryBooksResponseDto.builder()
                 .description(category.getDescription())
-                .bookResponseDtos(bookResponseDtos)
                 .id(category.getId())
+                .bookResponseDtos(bookResponseDtos)
                 .build();
-    }
-
-    @Override
-    @Transactional(readOnly=true)
-    public List<BookCategoryResponseDto> findByBookCategoryDescription(String description) {
-        var categories = this.bookCategoryRepository.findByDescriptionContainingIgnoreCase(description);
-
-        return categories.stream()
-                .map(category -> BookCategoryResponseDto.builder()
-                        .description(category.getDescription())
-                        .bookResponseDtos(category.getBooks().stream()
-                                .map(book -> BookResponseDto.builder()
-                                        .isbn(book.getIsbn())
-                                        .title(book.getTitle())
-                                        .description(book.getDescription())
-                                        .editionNumber(book.getEditionNumber())
-                                        .dimensions(book.getDimensions())
-                                        .pageCount(book.getPageCount())
-                                        .weight(book.getWeight())
-                                        .stock(book.getStock())
-                                        .price(book.getPrice())
-                                        .bookCategory(book.getBookCategory().getDescription())
-                                        .authors(book.getAuthors().stream()
-                                                .map(author -> author.getName()+
-                                                        " "+author.getLastName())
-                                                .collect(Collectors.toSet()))
-                                        .build())
-                                .collect(Collectors.toSet()))
-                        .build())
-                .toList();
-
     }
 }

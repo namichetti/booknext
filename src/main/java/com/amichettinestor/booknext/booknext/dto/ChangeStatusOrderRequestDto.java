@@ -11,7 +11,7 @@ import jakarta.validation.constraints.NotNull;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class ManagerChangeStatusOrderRequestDto {
+public class ChangeStatusOrderRequestDto {
 
     @NotNull(message = "El estado es obligatorio")
     private OrderStatus status;

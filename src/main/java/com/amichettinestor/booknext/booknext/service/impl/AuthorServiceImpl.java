@@ -31,13 +31,16 @@ public class AuthorServiceImpl implements AuthorService {
     }
 
     @Override
+    @Transactional
     public void save(AuthorRequestDto authorRequestDto) {
-        Author author = new Author();
+        var location = this.locationRepository.findByNameAndCountryName(
+                authorRequestDto.getLocation().getName(),
+                authorRequestDto.getLocation().getCountryName())
+                .orElseThrow(()->new LocationNotFound("No se encontró la localidad "+
+                        authorRequestDto.getLocation().getName()
+                        +" del país "+authorRequestDto.getLocation().getCountryName()));
 
-        var location = this.locationRepository.findById(author.getLocation().getId())
-                .orElseThrow(()->new LocationNotFound("No se encontró la localidad con id:"
-                        +author.getLocation().getId()));
-
+        var author = new Author();
         author.setName(authorRequestDto.getName());
         author.setLastName(authorRequestDto.getLastName());
         author.setLocation(location);
@@ -46,18 +49,30 @@ public class AuthorServiceImpl implements AuthorService {
     }
 
     @Override
+    @Transactional
     public void deleteById(Long id) {
         var author = this.authorRepository.findById(id)
                 .orElseThrow(()->new AuthorNotFoundException("El autor con id: "+id+" no existe"));
+
+        author.getBooks().forEach(author::removeBook);
 
         this.authorRepository.delete(author);
     }
 
     @Override
+    @Transactional
     public void patchAuthor(Long id, AuthorUpdateDto authorUpdateDto) {
         var author = this.authorRepository.findById(id)
                 .orElseThrow(()->new AuthorNotFoundException("El autor con id: "+id+" no existe"));
 
+        var location = this.locationRepository.findByNameAndCountryName(
+                        authorUpdateDto.getLocation().getName(),
+                        authorUpdateDto.getLocation().getCountryName())
+                .orElseThrow(()->new LocationNotFound("No se encontró la localidad "+
+                        authorUpdateDto.getLocation().getName()
+                        +" del país "+authorUpdateDto.getLocation().getCountryName()));
+
+        author.setLocation(location);
         //Clase para actualizar solo los campos que hay que actualizar.
         PatchUtils.copyNonNullProperties(authorUpdateDto, author);
 
@@ -65,16 +80,20 @@ public class AuthorServiceImpl implements AuthorService {
     }
 
     @Override
-    public void putAuthor(Long id, AuthorUpdateDto authorUpdateDto) {
+    @Transactional
+    public void putAuthor(Long id, AuthorRequestDto authorRequestDto) {
         var author = this.authorRepository.findById(id)
                 .orElseThrow(()->new AuthorNotFoundException("El autor con id: "+id+" no existe"));
 
-        var location = this.locationRepository.findById(author.getLocation().getId())
-                .orElseThrow(()->new LocationNotFound("No se encontró la localidad con id:"
-                        +author.getLocation().getId()));
+        var location = this.locationRepository.findByNameAndCountryName(
+                        authorRequestDto.getLocation().getName(),
+                        authorRequestDto.getLocation().getCountryName())
+                .orElseThrow(()->new LocationNotFound("No se encontró la localidad "
+                        +authorRequestDto.getLocation().getName()+ " del país "
+                        + authorRequestDto.getLocation().getCountryName()));
 
-        author.setLastName(authorUpdateDto.getLastName());
-        author.setName(authorUpdateDto.getLastName());
+        author.setLastName(authorRequestDto.getLastName());
+        author.setName(authorRequestDto.getLastName());
         author.setLocation(location);
 
         this.authorRepository.save(author);
@@ -118,7 +137,7 @@ public class AuthorServiceImpl implements AuthorService {
                     authorResponseDto.setLastName(author.getLastName());
                     authorResponseDto.setId(author.getId());
                     authorResponseDto.setLocation(
-                            LocationDto.builder()
+                            LocationRequestDto.builder()
                                     .countryName(author.getLocation().getCountry().getName())
                                     .name(author.getLocation().getName())
                                     .build());
@@ -140,7 +159,15 @@ public class AuthorServiceImpl implements AuthorService {
         AuthorResponseDto authorResponseDto = new AuthorResponseDto();
         authorResponseDto.setName(author.getName());
         authorResponseDto.setLastName(author.getLastName());
-        authorResponseDto.setLocation(LocationDto.builder()
+        authorResponseDto.setId(author.getId());
+        authorResponseDto.setBooks(
+                author.getBooks().stream()
+                        .map(book -> BookSummaryDto.builder()
+                                .isbn(book.getIsbn())
+                                .title(book.getTitle())
+                                .build())
+                        .collect(Collectors.toSet()));
+        authorResponseDto.setLocation(LocationRequestDto.builder()
                         .name(location.getName())
                         .countryName(location.getCountry().getName())
                 .build());

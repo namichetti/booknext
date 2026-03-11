@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import static org.springframework.security.config.http.SessionCreationPolicy.STATELESS;
@@ -26,10 +27,11 @@ public class SecurityConfig {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
+
                 .authorizeHttpRequests(requests ->requests
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**")
                         .permitAll()
-                        .requestMatchers(HttpMethod.GET,"/api/v1/auth/confirm","/api/v1/author/**","/api/v1/bookcategory/**","/api/v1/book/**","/api/v1/order","/api/v1/publisher/**")
+                        .requestMatchers(HttpMethod.GET,"/api/v1/auth/confirm","/api/v1/author/**","/api/v1/bookcategory/**","/api/v1/book/**","/api/v1/publisher/**")
                         .permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/webjars/**")
                         .permitAll()
@@ -49,15 +51,15 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN","USER","MANAGER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/user/admin/**")
                         .hasAnyRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/user/manager/**","/api/v1/order/manager/**")
-                        .hasAnyRole("MANAGER")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/book/**","/api/v1/bookcategory/**","/api/v1/author/**","/api/v1/author","/api/v1/publisher")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/user/manager/**","/api/v1/order/status/**")
+                        .hasAnyRole("MANAGER","ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/book/**","/api/v1/bookcategory/**","/api/v1/author/**","/api/v1/publisher/**")
                         .hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/order/**")
-                        .hasAnyRole("ADMIN","USER")
+                        .hasAnyRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/order/**")
                         .hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/book/**","/api/v1/bookcategory/**","/api/v1/author/**","/api/v1/author","/api/v1/publisher/**")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/book/**","/api/v1/bookcategory/**","/api/v1/author/**","/api/v1/publisher/**")
                         .hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .sessionManagement(session ->

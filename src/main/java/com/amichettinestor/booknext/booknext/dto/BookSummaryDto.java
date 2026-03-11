@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class BookSummaryDto {
 
+    private Long id;
     //@NotBlank(message = "El ISBN es obligatorio")
     private String isbn;
 

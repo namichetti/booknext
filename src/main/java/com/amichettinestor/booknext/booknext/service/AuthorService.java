@@ -16,7 +16,7 @@ public interface AuthorService {
 
     void patchAuthor(Long id, AuthorUpdateDto authorUpdateDto);
 
-    void putAuthor(Long id, AuthorUpdateDto authorUpdateDto);
+    void putAuthor(Long id, AuthorRequestDto authorRequestDto);
 
     List<AuthorResponseDto> search(String lastname, String country);
 

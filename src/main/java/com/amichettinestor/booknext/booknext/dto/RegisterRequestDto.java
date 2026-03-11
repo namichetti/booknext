@@ -34,5 +34,5 @@ public class RegisterRequestDto {
 
     @NotNull(message = "La ubicación es obligatoria")
     @Valid
-    private LocationDto location;
+    private LocationRequestDto location;
 }

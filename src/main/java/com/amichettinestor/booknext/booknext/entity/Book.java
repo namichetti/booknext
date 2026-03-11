@@ -79,10 +79,6 @@ public class Book {
         this.price = price;
     }
 
-    void setBookCategory(BookCategory category) {
-        this.bookCategory = category;
-    }
-
     public void addAuthor(Author author){
         this.authors.add(author);
         author.getBooks().add(this);

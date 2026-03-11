@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class PersonDto {
+public class PersonRequestDto {
 
     @NotBlank(message = "El nombre es obligatorio")
     private String name;
@@ -16,5 +16,5 @@ public class PersonDto {
 
     @NotNull(message = "La ubicación es obligatoria")
     @Valid
-    private LocationDto location;
+    private LocationRequestDto location;
 }

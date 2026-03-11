@@ -23,19 +23,11 @@ public class BooknextApplication implements CommandLineRunner {
     private UserRepository userRepository;
 
     @Autowired
-    private BookRepository bookRepository;
-
-    @Autowired
-    private BookCategoryRepository bookCategoryRepository;
-
-    @Autowired
-    private PublisherRepository publisherRepository;
-
-    @Autowired
     private LocationRepository locationRepository;
 
     @Autowired
-    private CountryRepository countryRepository;
+    private VerificationTokenRepository verificationTokenRepository;
+
 
     public static void main(String[] args) {
 		SpringApplication.run(BooknextApplication.class, args);
@@ -43,9 +35,12 @@ public class BooknextApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+
        //Insertamos un admin y un manager si es que no existe en la BD.
         if (this.userRepository.findByUsername("admin").isEmpty() &&
-                this.userRepository.findByUsername("manager").isEmpty()) {
+                this.userRepository.findByUsername("manager").isEmpty()
+                && this.userRepository.findByUsername("user").isEmpty()) {
+
             var admin = new User();
             admin.setUsername("admin");
             admin.setPassword(bCryptPasswordEncoder.encode("admin"));
@@ -72,7 +67,18 @@ public class BooknextApplication implements CommandLineRunner {
             manager.setAddress("Calle 777");
             manager.setLocation(location);
 
-            userRepository.saveAll(List.of(admin,manager));
+            var user = new User();
+            user.setUsername("user");
+            user.setPassword(bCryptPasswordEncoder.encode("user"));
+            user.setRole(Role.USER);
+            user.setName("user");
+            user.setLastName("user");
+            user.setEmail("user@gmail.com");
+            user.setStatus(UserStatus.ACTIVE);
+            user.setAddress("Calle 777");
+            user.setLocation(location);
+
+            userRepository.saveAll(List.of(admin,manager,user));
         }
 
     }

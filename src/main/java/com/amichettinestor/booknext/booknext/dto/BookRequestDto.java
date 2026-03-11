@@ -56,16 +56,12 @@ public class BookRequestDto {
     private BigDecimal price;
 
     @NotNull(message = "La categoría del libro es obligatoria")
-    @Valid
-    private BookCategoryRequestDto bookCategory;
+    private Long bookCategoryId;
 
-    @NotEmpty(message = "Debe haber al menos un autor")
-    //Set<@NotBlank(...)> valida cada elemento del set, asegurando que no haya strings vacíos.
-    @Builder.Default
-    private Set<@NotBlank(message = "El nombre del autor no puede estar vacío") String> authorNames = new HashSet<>();
+    @NotNull(message = "Debe haber al menos un autor")
+    private Set<Long> authorId;
 
-    @NotNull(message = "El publisher es obligatorio")
-    @Valid
-    private PublisherRequestDto publisherRequest;
+    @NotNull(message = "La editorial es obligatorio")
+    private Long publisherId;
 }
 
