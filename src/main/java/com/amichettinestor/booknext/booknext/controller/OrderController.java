@@ -37,7 +37,7 @@ public class OrderController {
 
 
     @PostMapping
-    public ResponseEntity<String> saveOrder(@Valid @RequestBody OrderRequestDto orderRequestDto){
+    public ResponseEntity<String> saveOrder(@RequestBody List<@Valid OrderRequestDto> orderRequestDto){
         this.orderService.save(orderRequestDto);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body("La orden se ha guardado correctamente.");
@@ -58,16 +58,7 @@ public class OrderController {
         return ResponseEntity.ok("La orden se actualizó correctamente.");
     }
 
-
-    @PutMapping("/{id}")
-    public ResponseEntity<String> putOrder(@PathVariable Long id,
-                                           @Valid @RequestBody OrderUpdateDto orderUpdateDto) {
-        this.orderService.putOrder(id,orderUpdateDto);
-        return ResponseEntity.ok("La orden se actualizó correctamente.");
-    }
-
-
-    @PatchMapping("/manager/{id}/status")
+    @PatchMapping("/status/{id}")
     public ResponseEntity<String> changeStatusByManager(@PathVariable Long id,
                                                         @Valid @RequestBody ChangeStatusOrderRequestDto statusOrderRequestDto) {
         this.orderService.changeStatus(id, statusOrderRequestDto);

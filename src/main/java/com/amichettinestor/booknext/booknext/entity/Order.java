@@ -8,7 +8,9 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -44,7 +46,8 @@ public class Order {
             orphanRemoval = true
     )
     @Builder.Default
-    private Set<OrderItem> items = new HashSet<>();
+
+    private List<OrderItem> items = new ArrayList<>();
 
     @Builder.Default
     private BigDecimal finalPrice = BigDecimal.ZERO;

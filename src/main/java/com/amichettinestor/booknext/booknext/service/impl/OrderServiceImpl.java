@@ -5,8 +5,10 @@ import com.amichettinestor.booknext.booknext.entity.Book;
 import com.amichettinestor.booknext.booknext.entity.Order;
 import com.amichettinestor.booknext.booknext.entity.OrderItem;
 import com.amichettinestor.booknext.booknext.enums.OrderStatus;
+import com.amichettinestor.booknext.booknext.enums.Role;
 import com.amichettinestor.booknext.booknext.exception.*;
 import com.amichettinestor.booknext.booknext.repository.BookRepository;
+import com.amichettinestor.booknext.booknext.repository.OrderItemRepository;
 import com.amichettinestor.booknext.booknext.repository.OrderRepository;
 import com.amichettinestor.booknext.booknext.repository.UserRepository;
 import com.amichettinestor.booknext.booknext.service.OrderService;
@@ -31,10 +33,11 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
+    private final OrderItemRepository orderItemRepository;
 
     @Override
     @Transactional
-    public void save(OrderRequestDto orderRequestDto) {
+    public void save(List<OrderRequestDto> orderRequestDtos) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
@@ -42,67 +45,71 @@ public class OrderServiceImpl implements OrderService {
         var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró al usuario " + username));
 
-        // Buscar carrito activo (orden con estado PROCESSING)
-        Optional<Order> cart = orderRepository.findByUserAndStatus(user, OrderStatus.PROCESSING);
+        // Buscar carrito activo
+        Order order = orderRepository.findByUserAndStatus(user, OrderStatus.PROCESSING)
+                .orElseGet(() -> Order.builder()
+                        .user(user)
+                        .status(OrderStatus.PROCESSING)
+                        .items(new ArrayList<>())
+                        .build());
 
-        Order order = cart.orElseGet(() -> Order.builder()
-                .user(user)
-                .status(OrderStatus.PROCESSING)
-                .items(new HashSet<>())
-                .build());
+        for (OrderRequestDto request : orderRequestDtos) {
 
-        for (var itemDto : orderRequestDto.getItems()) {
+            for (OrderItemRequestDto itemDto : request.getItems()) {
 
-            var book = bookRepository.findByIsbn(itemDto.getIsbn())
-                    .orElseThrow(() ->
-                            new BookNotFoundException("Libro no encontrado: " + itemDto.getIsbn()));
+                var book = bookRepository.findByIsbn(itemDto.getIsbn())
+                        .orElseThrow(() -> new BookNotFoundException(
+                                "Libro no encontrado: " + itemDto.getIsbn()
+                        ));
 
-            // Buscar si el item ya existe en la orden
-            Optional<OrderItem> existingItem = order.getItems().stream()
-                    .filter(i -> i.getBook().getIsbn().equalsIgnoreCase(itemDto.getIsbn()))
-                    .findFirst();
+                Optional<OrderItem> existingItem = order.getItems().stream()
+                        .filter(i -> i.getBook().getIsbn().equalsIgnoreCase(itemDto.getIsbn()))
+                        .findFirst();
 
-            if (existingItem.isPresent()) {
+                int newQuantity = itemDto.getQuantity();
 
-                OrderItem item = existingItem.get();
+                if (existingItem.isPresent()) {
 
-                int nuevaCantidad = item.getQuantity() + itemDto.getQuantity();
+                    OrderItem item = existingItem.get();
+                    int oldQuantity = item.getQuantity();
+                    int difference = newQuantity - oldQuantity;
 
-                if (book.getStock() < itemDto.getQuantity()) {
-                    throw new StockException("Stock insuficiente para el libro " + book.getTitle());
+                    // Validar stock SOLO si aumenta
+                    if (difference > 0 && book.getStock() < difference) {
+                        throw new StockException("Stock insuficiente para el libro " + book.getTitle());
+                    }
+
+                    // Ajustar stock correctamente
+                    book.setStock(book.getStock() - difference);
+
+                    // Actualizar cantidad
+                    item.setQuantity(newQuantity);
+
+                } else {
+
+                    // Nuevo item
+                    if (book.getStock() < newQuantity) {
+                        throw new StockException("Stock insuficiente para el libro " + book.getTitle());
+                    }
+
+                    book.setStock(book.getStock() - newQuantity);
+
+                    OrderItem newItem = OrderItem.builder()
+                            .book(book)
+                            .quantity(newQuantity)
+                            .unitPrice(book.getPrice())
+                            .order(order)
+                            .build();
+
+                    order.getItems().add(newItem);
                 }
 
-                book.setStock(book.getStock() - itemDto.getQuantity());
-
-                item.setQuantity(nuevaCantidad);
-
-            } else {
-
-                if (book.getStock() < itemDto.getQuantity()) {
-                    throw new StockException("Stock insuficiente para el libro " + book.getTitle());
-                }
-
-                book.setStock(book.getStock() - itemDto.getQuantity());
-
-                OrderItem newItem = OrderItem.builder()
-                        .book(book)
-                        .quantity(itemDto.getQuantity())
-                        .unitPrice(book.getPrice())
-                        .order(order)
-                        .build();
-
-                order.getItems().add(newItem);
+                bookRepository.save(book);
             }
-
-            bookRepository.save(book);
         }
 
-        // Recalcular total de la orden
-        BigDecimal total = order.getItems().stream()
-                .map(i -> i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        order.setFinalPrice(total);
+        // Recalcular total
+        order.recalculateTotal();
 
         orderRepository.save(order);
     }
@@ -114,13 +121,16 @@ public class OrderServiceImpl implements OrderService {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
+        var user = this.userRepository.findByUsername(username)
+                .orElseThrow(()->new UsernameNotFoundException("No se encontró al usuario "
+                        + username));
         var order = this.findOrderById(id);
 
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-
-        if (!isAdmin && !order.getUser().getUsername().equals(username)) {
-            throw new AccessDeniedException("No puede eliminar esta orden");
+        if(!user.getOrders().contains(order)) {
+            if(!user.getRole().equals(Role.ADMIN)){
+                throw new OrderNotBelongToException("La orden "+order.getId()+ " " +
+                        "no pertenece al usuario "+username);
+            }
         }
 
         // Devolvemos stock al eliminar la orden.
@@ -129,133 +139,56 @@ public class OrderServiceImpl implements OrderService {
             book.setStock(book.getStock() + orderItem.getQuantity());
             bookRepository.save(book);
         });
+        user.getOrders().remove(order);
 
-        // Eliminar la orden (cascade elimina también los OrderItem)
-        orderRepository.delete(order);
+        orderRepository.deleteById(order.getId());
     }
 
     @Override
     @Transactional
     public void patchOrder(Long id, OrderUpdateDto orderUpdateDto) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        boolean isAdminOrManager = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_MANAGER"));
+        var order = this.findOrderById(id);
 
-        var order = findOrderById(id);
+        orderUpdateDto.getItems().forEach(orderItem -> {
 
-        if (!isAdminOrManager && !order.getUser().getUsername().equals(username)) {
-            throw new AccessDeniedException("No puede actualizar esta orden");
-        }
-
-        // Solo actualizar propiedades que no afecten stock directamente
-        PatchUtils.copyNonNullProperties(orderUpdateDto, order);
-
-        // Actualizar cantidades de items y stock
-        for (OrderItemUpdateDto itemDto : orderUpdateDto.getItems()) {
-
-            // Buscar el OrderItem correspondiente
-            OrderItem orderItem = order.getItems().stream()
-                    .filter(i -> i.getBook().getIsbn().equalsIgnoreCase(itemDto.getIsbn()))
-                    .findFirst()
+            var book = this.orderItemRepository.findBookByIsbn(orderItem.getIsbn())
                     .orElseThrow(() -> new BookNotFoundException(
-                            "El libro con ISBN " + itemDto.getIsbn() + " no está en la orden"));
+                            "El libro con ISBN "
+                                    + orderItem.getIsbn() + " no se encontró."));
 
-            var book = orderItem.getBook();
+            order.getItems().forEach(orderItem1 -> {
 
-            int cantidadAnterior = orderItem.getQuantity();
-            int cantidadNueva = itemDto.getQuantity();
-            int diferencia = cantidadNueva - cantidadAnterior; // positiva = resta stock, negativa = devuelve stock
+                if (orderItem1.getBook().getIsbn().equals(book.getIsbn())) {
 
-            // Validar stock solo si estamos aumentando la cantidad
-            if (diferencia > 0 && book.getStock() < diferencia) {
-                throw new StockException("Stock insuficiente para el libro " + book.getTitle());
-            }
+                    int oldQuantity = orderItem1.getQuantity();
+                    int newQuantity = orderItem.getQuantity();
 
-            // Ajustar stock
-            book.setStock(book.getStock() - diferencia);
+                    int difference = newQuantity - oldQuantity;
 
-            // Actualizar cantidad en OrderItem
-            orderItem.setQuantity(cantidadNueva);
-
-            // Guardar cambios en el libro
-            bookRepository.save(book);
-        }
-
-        // Recalcular total de la orden
-        BigDecimal total = order.getItems().stream()
-                .map(i -> i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        order.setFinalPrice(total);
-
-        // Guardar la orden con los cambios
-        orderRepository.save(order);
-    }
-
-    @Override
-    @Transactional
-    public void putOrder(Long id, OrderUpdateDto orderUpdateDto) {
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-
-        var order = findOrderById(id);
-
-        // Validación de permisos
-        if (!isAdmin && !order.getUser().getUsername().equals(username)) {
-            throw new AccessDeniedException("No puede actualizar esta orden");
-        }
-
-        // --- 1. Devolver stock de los items antiguos y limpiar la colección ---
-        order.getItems().stream()
-                .peek(oldItem -> {
-                    Book book = oldItem.getBook();
-                    book.setStock(book.getStock() + oldItem.getQuantity());
-                    bookRepository.saveAndFlush(book);
-                })
-                .forEach(oldItem -> oldItem.setOrder(null)); // rompe la referencia bidireccional
-
-        order.getItems().clear(); // limpieza segura después de romper referencias
-
-        // --- 2. Agregar y actualizar items nuevos desde el DTO ---
-        Set<OrderItem> newItems = orderUpdateDto.getItems().stream()
-                .map(itemDto -> {
-                    Book book = bookRepository.findByIsbn(itemDto.getIsbn())
-                            .orElseThrow(() -> new BookNotFoundException(
-                                    "Libro no encontrado: " + itemDto.getIsbn()));
-
-                    if (book.getStock() < itemDto.getQuantity()) {
-                        throw new StockException("Stock insuficiente para el libro " + book.getTitle());
+                    // Si quiere más unidades → verificar stock
+                    if (difference > 0) {
+                        if (book.getStock() < difference) {
+                            throw new StockException("Stock insuficiente");
+                        }
+                        book.setStock(book.getStock() - difference);
                     }
 
-                    book.setStock(book.getStock() - itemDto.getQuantity());
-                    bookRepository.saveAndFlush(book);
+                    // Si quiere menos unidades → devolver stock
+                    if (difference < 0) {
+                        book.setStock(book.getStock() + Math.abs(difference));
+                    }
 
-                    return OrderItem.builder()
-                            .book(book)
-                            .quantity(itemDto.getQuantity())
-                            .unitPrice(book.getPrice())
-                            .order(order)
-                            .build();
-                })
-                .collect(Collectors.toSet());
+                    // Actualizar order item
+                    orderItem1.setQuantity(newQuantity);
 
-        newItems.forEach(order::addItem); // agrega items manteniendo la relación bidireccional
+                    this.orderItemRepository.save(orderItem1);
+                    this.bookRepository.save(book);
+                }
+            });
 
-
-        // --- 4. Recalcular total de la orden ---
-        BigDecimal total = order.getItems().stream()
-                .map(i -> i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        order.setFinalPrice(total);
-
-        // --- 5. Guardar la orden con todos los cambios ---
-        orderRepository.save(order);
+        });
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -299,16 +232,21 @@ public class OrderServiceImpl implements OrderService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
 
-        var order = findOrderById(id);
+        var user = this.userRepository.findByUsername(username)
+                .orElseThrow(()->new UsernameNotFoundException("No se encontró al usuario "
+                        + username));
 
-        // Validar si el usuario puede acceder
-        boolean isAdminOrManager = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")
-                        || a.getAuthority().equals("ROLE_MANAGER"));
+        var order = this.findOrderById(id);
 
-        if (!isAdminOrManager && !order.getUser().getUsername().equals(username)) {
-            throw new AccessDeniedException("No puede acceder a esta orden");
+        if(!user.getOrders().contains(order)) {
+            if(!user.getRole().equals(Role.ADMIN) && !user.getRole().equals(Role.MANAGER)){
+                throw new OrderNotBelongToException("La orden "+order.getId()+ " " +
+                        "no pertenece al usuario "+username);
+            }
+
         }
+
+
 
         return OrderResponseDto.builder()
                 .id(order.getId())
@@ -347,7 +285,7 @@ public class OrderServiceImpl implements OrderService {
         if (requestedStatus != OrderStatus.SUSPENDED &&
                 requestedStatus != OrderStatus.COMPLETED &&
                 requestedStatus != OrderStatus.PROCESSING) {
-            throw new AdminChangeStatusException("El estado solicitado no puede ser asignado");
+            throw new OrderStatusException("El estado solicitado no puede ser asignado");
         }
 
         OrderStatus newStatus;
@@ -363,4 +301,6 @@ public class OrderServiceImpl implements OrderService {
 
         this.orderRepository.save(order);
     }
+
+
 }

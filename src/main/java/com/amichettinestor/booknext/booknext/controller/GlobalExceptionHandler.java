@@ -118,6 +118,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
+    @ExceptionHandler(OrderStatusException.class)
+    public ResponseEntity<String> handleOrderStatus(OrderStatusException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
+    @ExceptionHandler(OrderNotBelongToException.class)
+    public ResponseEntity<String> handleOrderNotBelongTo(OrderNotBelongToException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(OrderCannotBeDeletedException.class)
+    public ResponseEntity<String> handleOrderCannotBeDeleted(OrderCannotBeDeletedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
 
 }
 

@@ -6,13 +6,11 @@ import java.util.List;
 
 public interface OrderService {
 
-    void save(OrderRequestDto orderRequestDto);
+    void save(List<OrderRequestDto> orderRequestDto);
 
     void deleteById(Long id);
 
     void patchOrder(Long id, OrderUpdateDto orderUpdateDto);
-
-    void putOrder(Long id, OrderUpdateDto orderUpdateDto);
 
     OrderResponseDto findById(Long id);
 
