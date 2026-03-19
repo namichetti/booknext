@@ -25,9 +25,6 @@ public class BooknextApplication implements CommandLineRunner {
     @Autowired
     private LocationRepository locationRepository;
 
-    @Autowired
-    private VerificationTokenRepository verificationTokenRepository;
-
 
     public static void main(String[] args) {
 		SpringApplication.run(BooknextApplication.class, args);
