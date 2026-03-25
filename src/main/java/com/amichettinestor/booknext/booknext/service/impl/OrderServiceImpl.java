@@ -7,6 +7,7 @@ import com.amichettinestor.booknext.booknext.entity.OrderItem;
 import com.amichettinestor.booknext.booknext.enums.OrderStatus;
 import com.amichettinestor.booknext.booknext.enums.Role;
 import com.amichettinestor.booknext.booknext.exception.*;
+import com.amichettinestor.booknext.booknext.mapper.OrderMapper;
 import com.amichettinestor.booknext.booknext.repository.BookRepository;
 import com.amichettinestor.booknext.booknext.repository.OrderItemRepository;
 import com.amichettinestor.booknext.booknext.repository.OrderRepository;
@@ -34,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderMapper orderMapper;
 
     @Override
     @Transactional
@@ -46,7 +48,7 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró al usuario " + username));
 
         // Buscar carrito activo
-        Order order = orderRepository.findByUserAndStatus(user, OrderStatus.PROCESSING)
+        var order = orderRepository.findByUserAndStatus(user, OrderStatus.PROCESSING)
                 .orElseGet(() -> Order.builder()
                         .user(user)
                         .status(OrderStatus.PROCESSING)
@@ -206,23 +208,7 @@ public class OrderServiceImpl implements OrderService {
             orders = orderRepository.findByUserUsername(username); // USER solo sus órdenes
         }
 
-        return orders.stream()
-                .map(order -> OrderResponseDto.builder()
-                        .id(order.getId())
-                        .orderDate(order.getOrderDate())
-                        .status(order.getStatus())
-                        .totalPrice(order.getFinalPrice())
-                        .items(order.getItems().stream()
-                                .map(item -> OrderItemResponseDto.builder()
-                                        .isbn(item.getBook().getIsbn())
-                                        .title(item.getBook().getTitle())
-                                        .unitPrice(item.getUnitPrice())
-                                        .quantity(item.getQuantity())
-                                        .subtotal(item.getSubtotal())
-                                        .build())
-                                .collect(Collectors.toSet()))
-                        .build())
-                .collect(Collectors.toList());
+        return this.orderMapper.toDtoList(orders);
     }
 
     @Override
@@ -245,24 +231,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
         }
-
-
-
-        return OrderResponseDto.builder()
-                .id(order.getId())
-                .orderDate(order.getOrderDate())
-                .status(order.getStatus())
-                .totalPrice(order.getFinalPrice())
-                .items(order.getItems().stream()
-                        .map(item -> OrderItemResponseDto.builder()
-                                .isbn(item.getBook().getIsbn())
-                                .title(item.getBook().getTitle())
-                                .unitPrice(item.getUnitPrice())
-                                .quantity(item.getQuantity())
-                                .subtotal(item.getSubtotal())
-                                .build())
-                        .collect(Collectors.toSet()))
-                .build();
+        return this.orderMapper.toDto(order);
     }
 
 

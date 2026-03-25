@@ -5,6 +5,7 @@ import com.amichettinestor.booknext.booknext.enums.AdminChangeUserStatus;
 import com.amichettinestor.booknext.booknext.enums.ManagerChangeUserStatus;
 import com.amichettinestor.booknext.booknext.enums.UserStatus;
 import com.amichettinestor.booknext.booknext.exception.*;
+import com.amichettinestor.booknext.booknext.mapper.UserMapper;
 import com.amichettinestor.booknext.booknext.repository.LocationRepository;
 import com.amichettinestor.booknext.booknext.repository.UserRepository;
 import com.amichettinestor.booknext.booknext.service.EmailService;
@@ -21,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static com.amichettinestor.booknext.booknext.util.Constants.BODY_CHANGE_EMAIL;
+import static com.amichettinestor.booknext.booknext.util.Constants.SUBJECT_CHANGE_EMAIL;
+
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class UserServiceImpl implements UserService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final LocationRepository locationRepository;
+    private final UserMapper userMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -40,18 +45,7 @@ public class UserServiceImpl implements UserService {
 
         var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario " + username));
-
-        return UserResponseDto.builder()
-                .address(user.getAddress())
-                .name(user.getName())
-                .id(user.getId())
-                .email(user.getEmail())
-                .lastName(user.getLastName())
-                .location(LocationRequestDto.builder()
-                        .name(user.getLocation().getName())
-                        .countryName(user.getLocation().getCountry().getName())
-                        .build())
-                .build();
+        return this.userMapper.toDto(user);
     }
 
     @Override
@@ -71,22 +65,9 @@ public class UserServiceImpl implements UserService {
                         +requestDto.getLocation().getName()+ " del país "
                         + requestDto.getLocation().getCountryName()));
 
-        user.setLocation(location);
-        PatchUtils.copyNonNullProperties(requestDto, user);
-
+        this.userMapper.patchFromDto(user,location,requestDto);
         this.userRepository.save(user);
-
-        return UserResponseDto.builder()
-                .address(user.getAddress())
-                .name(user.getName())
-                .lastName(user.getLastName())
-                .id(user.getId())
-                .email(user.getEmail())
-                .location(LocationRequestDto.builder()
-                        .name(user.getLocation().getName())
-                        .countryName(user.getLocation().getCountry().getName())
-                        .build())
-                .build();
+        return this.userMapper.toDto(user);
     }
 
     @Override
@@ -148,17 +129,8 @@ public class UserServiceImpl implements UserService {
 
         user.setEmail(changeEmailRequestDto.getEmail());
         var savedUser=this.userRepository.save(user);
-
-        //formo el mensaje a enviar por email
-        String subject = "Cambio de email";
-        String body = """
-        Su email se ha actualizado correctamente.
-        
-        Saludos.
-        """;
-
         // Enviar correo al usuario
-        emailService.sendEmail(savedUser.getEmail(), subject, body);
+        emailService.sendEmail(savedUser.getEmail(), SUBJECT_CHANGE_EMAIL, BODY_CHANGE_EMAIL);
     }
 
     @Override
@@ -166,37 +138,14 @@ public class UserServiceImpl implements UserService {
     public UserResponseDto findById(Long id) {
         var user = userRepository.findById(id)
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id " + id));
-
-        return UserResponseDto.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .lastName(user.getLastName())
-                .address(user.getAddress())
-                .email(user.getEmail())
-                .location(LocationRequestDto.builder()
-                        .countryName(user.getLocation().getCountry().getName())
-                        .name(user.getLocation().getName())
-                        .build())
-                .build();
+        return this.userMapper.toDto(user);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<UserResponseDto> findAll() {
         var users = this.userRepository.findAll();
-        return users.stream()
-                .map(user -> UserResponseDto.builder()
-                        .id(user.getId())
-                        .name(user.getName())
-                        .lastName(user.getLastName())
-                        .address(user.getAddress())
-                        .email(user.getEmail())
-                        .location(LocationRequestDto.builder()
-                                .countryName(user.getLocation().getCountry().getName())
-                                .name(user.getLocation().getName())
-                                .build())
-                        .build())
-                .toList();
+        return this.userMapper.toDtoList(users);
     }
 
     @Override
@@ -206,8 +155,14 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new UsernameNotFoundException("No se encontró el usuario con id " + id));
 
         var requestedStatus = managerChangeStatusRequestDto.getStatus();
+        UserStatus newStatus;
+        if(requestedStatus == ManagerChangeUserStatus.SUSPENDED){
+            newStatus = UserStatus.SUSPENDED;
+        }else{
+            newStatus = UserStatus.INACTIVE;
+        }
 
-        user.setStatus(UserStatus.SUSPENDED);
+        user.setStatus(newStatus);
 
         this.userRepository.save(user);
     }

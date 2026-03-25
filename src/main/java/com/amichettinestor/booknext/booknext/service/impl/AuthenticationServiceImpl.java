@@ -32,6 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static com.amichettinestor.booknext.booknext.util.Constants.BODY_CONFIRMATION;
+import static com.amichettinestor.booknext.booknext.util.Constants.SUBJECT_CONFIRMATION;
+
 @RequiredArgsConstructor
 @Service
 public class AuthenticationServiceImpl implements AuthenticationService{
@@ -124,19 +127,11 @@ public class AuthenticationServiceImpl implements AuthenticationService{
         verificationTokenRepository.save(verificationToken);
 
         //formo el mensaje a enviar por email
-        String subject = "Confirmá tu cuenta";
-        String link=this.confirmationLink + "/auth/confirm?token=" + token;
-        String body = """
-        Gracias por registrarte.
-        
-        Para activar tu cuenta, haz click en el siguiente enlace:
-        %s
-        
-        Este enlace expira en 5 minutos.
-        """.formatted(link);
+        String link=this.confirmationLink + "/confirm?token=" + token;
+        String body = BODY_CONFIRMATION.formatted(link);
 
         // Enviar correo al usuario
-        emailService.sendEmail(savedUser.getEmail(), subject, body);
+        emailService.sendEmail(savedUser.getEmail(), SUBJECT_CONFIRMATION, body);
     }
 
     @Override

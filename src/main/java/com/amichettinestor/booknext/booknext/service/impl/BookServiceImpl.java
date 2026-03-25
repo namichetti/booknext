@@ -6,6 +6,7 @@ import com.amichettinestor.booknext.booknext.exception.AuthorNotFoundException;
 import com.amichettinestor.booknext.booknext.exception.BookCategoryNotFoundException;
 import com.amichettinestor.booknext.booknext.exception.BookNotFoundException;
 import com.amichettinestor.booknext.booknext.exception.PublisherNotFoundException;
+import com.amichettinestor.booknext.booknext.mapper.BookMapper;
 import com.amichettinestor.booknext.booknext.repository.AuthorRepository;
 import com.amichettinestor.booknext.booknext.repository.BookCategoryRepository;
 import com.amichettinestor.booknext.booknext.repository.BookRepository;
@@ -29,12 +30,13 @@ public class BookServiceImpl implements BookService{
     private final AuthorRepository authorRepository;
     private final BookCategoryRepository bookCategoryRepository;
     private final PublisherRepository publisherCategory;
+    private final BookMapper bookMapper;
 
     @Override
     @Transactional(readOnly=true)
     public List<BookResponseDto> findAll() {
         var books= this.bookRepository.findAll();
-        return getBookResponseDtos(books);
+        return this.bookMapper.toDtoList(books);
     }
 
     @Override
@@ -42,32 +44,10 @@ public class BookServiceImpl implements BookService{
     public BookResponseDto findById(Long id) {
         var book= this.bookRepository.findById(id)
                 .orElseThrow(()->new BookNotFoundException("No se encontró el libro con id "+id));
-
-        return BookResponseDto.builder()
-                .id(book.getId())
-                .authors(book.getAuthors().stream()
-                        .map(author -> author.getName()+ " "+
-                                author.getLastName())
-                        .collect(Collectors.toSet()))
-                .isbn(book.getIsbn())
-                .publisher(book.getPublisher().getName())
-                .bookCategory(book.getBookCategory().getDescription())
-                .title(book.getTitle())
-                .description(book.getDescription())
-                .editionNumber(book.getEditionNumber())
-                .dimensions(book.getDimensions())
-                .pageCount(book.getPageCount())
-                .weight(book.getWeight())
-                .stock(book.getStock())
-                .price(book.getPrice())
-                .build();
+        return this.bookMapper.toDto(book);
     }
 
     @Override
-    //Con lo establecido en las configuraciones alcanzaría pero,
-    // puede haber casos en que se llegue a este método por otro camino.
-    //Por eso podemos poner un "doble candado".
-    //@PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     @Transactional
     public void save(BookRequestDto bookRequestDto) {
 
@@ -80,33 +60,18 @@ public class BookServiceImpl implements BookService{
                         +bookRequestDto.getPublisherId() +" no existe."));
 
         var authorIds = bookRequestDto.getAuthorId();
-
         var authors = new HashSet<>(authorRepository.findAllById(authorIds));
 
-        var book= Book.builder()
-                .isbn(bookRequestDto.getIsbn())
-                .title(bookRequestDto.getTitle())
-                .description(bookRequestDto.getDescription())
-                .editionNumber(bookRequestDto.getEditionNumber())
-                .dimensions(bookRequestDto.getDimensions())
-                .pageCount(bookRequestDto.getPageCount())
-                .weight(bookRequestDto.getWeight())
-                .stock(bookRequestDto.getStock())
-                .price(bookRequestDto.getPrice())
-                .publisher(publisher)
-                .bookCategory(category)
-                .authors(authors)
-                .build();
-
-        this.bookRepository.save(book);
+        this.bookRepository.save(this.bookMapper.toEntity(bookRequestDto,publisher,category,authors));
     }
 
 
     @Override
     @Transactional
     public void deleteById(Long id) {
-        var book= this.bookRepository.findById(id)
-                .orElseThrow(()->new BookNotFoundException("El libro con id: "+id+" no existe"));
+        if(this.bookRepository.existsById(id)) {
+            throw new BookNotFoundException("El libro con id: "+id+" no existe");
+        }
         this.bookRepository.deleteById(id);
     }
 
@@ -129,14 +94,7 @@ public class BookServiceImpl implements BookService{
 
         var publisher =publisherCategory.findById(bookUpdateDto.getPublisherId())
                 .orElseThrow(()-> new PublisherNotFoundException("La editorial no existe."));
-
-        book.setPublisher(publisher);
-        book.setAuthors(authors);
-        book.setBookCategory(bookCategory);
-
-        //Clase para actualizar solo los campos que hay que actualizar.
-        PatchUtils.copyNonNullProperties(bookUpdateDto, book);
-
+        this.bookMapper.patchFromDto(book,bookUpdateDto,publisher,bookCategory,authors);
         this.bookRepository.save(book);
     }
 
@@ -160,27 +118,15 @@ public class BookServiceImpl implements BookService{
         var publisher =publisherCategory.findById(bookUpdateDto.getPublisherId())
                 .orElseThrow(()-> new PublisherNotFoundException("La editorial no existe."));
 
-        book.setEditionNumber(bookUpdateDto.getEditionNumber());
-        book.setDimensions(bookUpdateDto.getDimensions());
-        book.setPageCount(bookUpdateDto.getPageCount());
-        book.setWeight(bookUpdateDto.getWeight());
-        book.setStock(bookUpdateDto.getStock());
-        book.setPrice(bookUpdateDto.getPrice());
-        book.setDescription(bookUpdateDto.getDescription());
-        book.setTitle(bookUpdateDto.getTitle());
-        book.setPublisher(publisher);
-        book.setAuthors(authors);
-        book.setBookCategory(bookCategory);
-
-
-        this.bookRepository.save(book);
+        this.bookRepository.save(this.bookMapper
+                .putFromDto(book,bookUpdateDto,publisher,bookCategory,authors));
     }
 
     @Override
     @Transactional(readOnly=true)
     public List<BookResponseDto> searchByText(String text) {
         var books= this.bookRepository.searchByText(text);
-        return getBookResponseDtos(books);
+        return this.bookMapper.toDtoList(books);
     }
 
 
@@ -188,31 +134,7 @@ public class BookServiceImpl implements BookService{
     @Transactional(readOnly=true)
     public List<BookResponseDto> searchByPriceRange(BigDecimal min, BigDecimal max) {
         var books= this.bookRepository.findByPriceBetween(min,max);
-        return getBookResponseDtos(books);
+        return this.bookMapper.toDtoList(books);
     }
 
-    private List<BookResponseDto> getBookResponseDtos(List<Book> books) {
-        return books.stream()
-                .map(book -> BookResponseDto.builder()
-                        .id(book.getId())
-                        .authors(book.getAuthors().stream()
-                                .map(author -> author.getName()+ " "+
-                                        author.getLastName())
-                                .collect(Collectors.toSet()))
-                        .isbn(book.getIsbn())
-                        .publisher(book.getPublisher().getName())
-                        .title(book.getTitle())
-                        .description(book.getDescription())
-                        .editionNumber(book.getEditionNumber())
-                        .dimensions(book.getDimensions())
-                        .pageCount(book.getPageCount())
-                        .weight(book.getWeight())
-                        .stock(book.getStock())
-                        .price(book.getPrice())
-                        .bookCategory(book.getBookCategory().getDescription())
-                        .authors(book.getAuthors().stream()
-                                .map(author -> author.getName()+" "+author.getLastName())
-                                .collect(Collectors.toSet())).build())
-                .toList();
-    }
 }

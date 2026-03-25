@@ -4,6 +4,7 @@ import com.amichettinestor.booknext.booknext.dto.*;
 import com.amichettinestor.booknext.booknext.entity.Author;
 import com.amichettinestor.booknext.booknext.exception.AuthorNotFoundException;
 import com.amichettinestor.booknext.booknext.exception.LocationNotFound;
+import com.amichettinestor.booknext.booknext.mapper.AuthorMapper;
 import com.amichettinestor.booknext.booknext.repository.AuthorRepository;
 import com.amichettinestor.booknext.booknext.repository.LocationRepository;
 import com.amichettinestor.booknext.booknext.service.AuthorService;
@@ -21,13 +22,14 @@ public class AuthorServiceImpl implements AuthorService {
 
     private final AuthorRepository authorRepository;
     private final LocationRepository locationRepository;
+    private final AuthorMapper authorMapper;
 
     @Override
     @Transactional(readOnly=true)
     public List<AuthorResponseDto> findAll() {
 
         var authors =this.authorRepository.findAll();
-        return getAuthorResponseDtos(authors);
+        return this.authorMapper.toDtoList(authors);
     }
 
     @Override
@@ -72,9 +74,8 @@ public class AuthorServiceImpl implements AuthorService {
                         authorUpdateDto.getLocation().getName()
                         +" del país "+authorUpdateDto.getLocation().getCountryName()));
 
-        author.setLocation(location);
         //Clase para actualizar solo los campos que hay que actualizar.
-        PatchUtils.copyNonNullProperties(authorUpdateDto, author);
+        this.authorMapper.patchFromDto(authorUpdateDto,author,location);
 
         this.authorRepository.save(author);
     }
@@ -92,11 +93,7 @@ public class AuthorServiceImpl implements AuthorService {
                         +authorRequestDto.getLocation().getName()+ " del país "
                         + authorRequestDto.getLocation().getCountryName()));
 
-        author.setLastName(authorRequestDto.getLastName());
-        author.setName(authorRequestDto.getLastName());
-        author.setLocation(location);
-
-        this.authorRepository.save(author);
+        this.authorRepository.save(this.authorMapper.toEntity(authorRequestDto,author,location));
     }
 
     @Override
@@ -119,31 +116,7 @@ public class AuthorServiceImpl implements AuthorService {
             authors = authorRepository.findAll();
         }
 
-        return getAuthorResponseDtos(authors);
-    }
-
-    private List<AuthorResponseDto> getAuthorResponseDtos(List<Author> authors) {
-        return authors.stream()
-                .map(author -> {
-                    AuthorResponseDto authorResponseDto = new AuthorResponseDto();
-                    authorResponseDto.setBooks(
-                            author.getBooks().stream()
-                                    .map(book -> BookSummaryDto.builder()
-                                            .isbn(book.getIsbn())
-                                            .title(book.getTitle())
-                                            .build())
-                                    .collect(Collectors.toSet()));
-                    authorResponseDto.setName(author.getName());
-                    authorResponseDto.setLastName(author.getLastName());
-                    authorResponseDto.setId(author.getId());
-                    authorResponseDto.setLocation(
-                            LocationRequestDto.builder()
-                                    .countryName(author.getLocation().getCountry().getName())
-                                    .name(author.getLocation().getName())
-                                    .build());
-                    return authorResponseDto;
-                })
-                .toList();
+        return this.authorMapper.toDtoList(authors);
     }
 
     @Override
@@ -156,22 +129,6 @@ public class AuthorServiceImpl implements AuthorService {
                 .orElseThrow(()->new LocationNotFound("No se encontró la localidad con id:"
                         +author.getLocation().getId()));
 
-        AuthorResponseDto authorResponseDto = new AuthorResponseDto();
-        authorResponseDto.setName(author.getName());
-        authorResponseDto.setLastName(author.getLastName());
-        authorResponseDto.setId(author.getId());
-        authorResponseDto.setBooks(
-                author.getBooks().stream()
-                        .map(book -> BookSummaryDto.builder()
-                                .isbn(book.getIsbn())
-                                .title(book.getTitle())
-                                .build())
-                        .collect(Collectors.toSet()));
-        authorResponseDto.setLocation(LocationRequestDto.builder()
-                        .name(location.getName())
-                        .countryName(location.getCountry().getName())
-                .build());
-
-        return authorResponseDto;
+        return this.authorMapper.toDto(author,location);
     }
 }

@@ -4,6 +4,7 @@ import com.amichettinestor.booknext.booknext.dto.*;
 import com.amichettinestor.booknext.booknext.entity.Publisher;
 import com.amichettinestor.booknext.booknext.exception.PublisherAlreadyExistsException;
 import com.amichettinestor.booknext.booknext.exception.PublisherNotFoundException;
+import com.amichettinestor.booknext.booknext.mapper.PublisherMapper;
 import com.amichettinestor.booknext.booknext.repository.PublisherRepository;
 import com.amichettinestor.booknext.booknext.service.PublisherService;
 import com.amichettinestor.booknext.booknext.util.PatchUtils;
@@ -19,16 +20,14 @@ import java.util.stream.Collectors;
 public class PublisherServiceImpl implements PublisherService {
 
     private final PublisherRepository publisherRepository;
+    private final PublisherMapper publisherMapper;
 
     @Override
     public void putPublisher(Long id, PublisherUpdateDto publisherUpdateDto) {
         var publisher = this.publisherRepository.findById(id)
                 .orElseThrow(() -> new PublisherNotFoundException("No se encontró la editorial con id: "+
                         id));
-
-        publisher.setName(publisherUpdateDto.getName());
-
-        this.publisherRepository.save(publisher);
+        this.publisherRepository.save(this.publisherMapper.putFromDto(publisher,publisherUpdateDto));
     }
 
     @Override
@@ -36,9 +35,7 @@ public class PublisherServiceImpl implements PublisherService {
         var publisher = this.publisherRepository.findById(id)
                 .orElseThrow(() -> new PublisherNotFoundException("No se encontró la editorial con id: "+
                         id));
-
-        PatchUtils.copyNonNullProperties(publisherUpdateDto, publisher);
-
+        this.publisherMapper.patchFromDto(publisher, publisherUpdateDto);
         this.publisherRepository.save(publisher);
     }
 
@@ -50,22 +47,7 @@ public class PublisherServiceImpl implements PublisherService {
         if (publishers==null || publishers.isEmpty()) {
             throw new PublisherNotFoundException("No se encontraron editoriales");
         }
-
-        return publishers.stream()
-                .map(publisher -> PublisherResponseDto.builder()
-                        .name(publisher.getName())
-                        .id(publisher.getId())
-                        .books(publisher.getBooks().stream()
-                                .map(book -> BookSummaryDto.builder()
-                                        .id(book.getId())
-                                        .isbn(book.getIsbn())
-                                        .title(book.getTitle())
-                                        .build()
-                                )
-                                .collect(Collectors.toSet()))
-                        .build()
-                )
-                .toList();
+        return this.publisherMapper.toDtoList(publishers);
     }
 
     @Override
@@ -75,12 +57,7 @@ public class PublisherServiceImpl implements PublisherService {
         if (publisheryExist) {
             throw new PublisherAlreadyExistsException("La editorial ya existe.");
         }
-
-        var publisher = Publisher.builder()
-                .name(publisherRequestDto.getName())
-                .build();
-
-        publisherRepository.save(publisher);
+        publisherRepository.save(this.publisherMapper.toEntity(publisherRequestDto));
     }
 
     @Override
@@ -96,18 +73,7 @@ public class PublisherServiceImpl implements PublisherService {
     public PublisherResponseDto findById(Long id) {
         var publisher = publisherRepository.findById(id)
                 .orElseThrow(()->new PublisherNotFoundException("No se encontró la editorial con id "+id));
-
-        return PublisherResponseDto.builder()
-                .name(publisher.getName())
-                .id(publisher.getId())
-                .books(publisher.getBooks().stream()
-                        .map(book -> BookSummaryDto.builder()
-                                .id(book.getId())
-                        .isbn(book.getIsbn())
-                        .title(book.getTitle())
-                        .build()
-                )
-                .collect(Collectors.toSet())).build();
+        return this.publisherMapper.toDto(publisher);
     }
 
     @Override
